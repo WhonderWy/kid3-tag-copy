@@ -221,3 +221,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+AppDir
+appimagetool-x86_64.AppImage
+kid3-tag-copy.desktop
