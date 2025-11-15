@@ -13,7 +13,7 @@ setup(
     packages=["kid3_tag_copy"],
     scripts=["kid3-tag-copy.py"],
     install_requires=[
-        "PySide6",
+        "pyside6",
     ],
     extras_require={
         "system": [

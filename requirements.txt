@@ -1,5 +1,2 @@
 pip
-PySide6
-PySide6_Addons
-PySide6_Essentials
-shiboken6
+pyside6
