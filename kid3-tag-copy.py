@@ -50,15 +50,21 @@ def copy_and_paste_tags_bulk(source_files, dest_files, log_func=print):
 # --- GUI Widgets ---
 
 class FileListWidget(QtWidgets.QListWidget):
-    """A QListWidget that supports drag/drop between lists with removal on drag out."""
-    def __init__(self, name="", parent=None):
+    """Multi-select, reorderable, drag/drop capable list widget."""
+    def __init__(self, label, parent=None):
         super().__init__(parent)
-        self.name = name
+        self.label = label
+
+        # Multi-select
         self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+
+        # Drag/drop
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
-        self.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
         self.setDefaultDropAction(QtCore.Qt.MoveAction)
+        self.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
+
+    # --- Drag / Drop handling ---
 
     def dragEnterEvent(self, event):
         if event.source() != self and event.mimeData().hasText():
@@ -73,30 +79,36 @@ class FileListWidget(QtWidgets.QListWidget):
             super().dragMoveEvent(event)
 
     def dropEvent(self, event):
-        if event.source() == self:
-            super().dropEvent(event)  # internal move
-        elif event.mimeData().hasText():
-            # Copy dragged items from another list and convert to absolute paths
-            for text in event.mimeData().text().splitlines():
-                if "file:" in text:
-                    abs_path = str(Path.from_uri(text).expanduser().resolve())
-                else:
-                    abs_path = str(Path(text).expanduser().resolve())
-                if not self.findItems(abs_path, QtCore.Qt.MatchExactly):
-                    self.addItem(abs_path)
+        md = event.mimeData()
+
+        # dragged from external file manager
+        if md.hasUrls():
+            for url in md.urls():
+                abs_path = Path(url.toLocalFile()).resolve()
+                if abs_path.exists() and not self.findItems(str(abs_path), QtCore.Qt.MatchExactly):
+                    self.addItem(str(abs_path))
+
+        # dragged from another list widget
+        elif md.hasText():
+            for line in md.text().splitlines():
+                p = Path(line).resolve()
+                if p.exists() and not self.findItems(str(p), QtCore.Qt.MatchExactly):
+                    self.addItem(str(p))
+
             event.acceptProposedAction()
 
     def startDrag(self, dropActions):
         drag = QtGui.QDrag(self)
         mime = QtCore.QMimeData()
-        selected_text = "\n".join([item.text() for item in self.selectedItems()])
-        mime.setText(selected_text)
+        paths = "\n".join(item.text() for item in self.selectedItems())
+        mime.setText(paths)
         drag.setMimeData(mime)
+
         if drag.exec(QtCore.Qt.MoveAction) == QtCore.Qt.MoveAction:
-            # Remove items after successful move out
             for item in self.selectedItems():
                 self.takeItem(self.row(item))
 
+    # --- Delete key support ---
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Delete:
             self.remove_selected_items()
@@ -123,60 +135,64 @@ class TagCopyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Kid3 Tag Copy")
-        self.resize(1200, 500)
+        self.resize(1200, 650)
 
-        layout = QtWidgets.QHBoxLayout(self)
+        # Make a grid layout: 2 cols × 3 rows
+        grid = QtWidgets.QGridLayout(self)
 
-        # Source panel
-        src_layout = QtWidgets.QVBoxLayout()
-        src_label = QtWidgets.QLabel("Source Files (reorderable and draggable)")
-        self.src_list = FileListWidget("src")
-        src_layout.addWidget(src_label)
-        src_layout.addWidget(self.src_list)
-        layout.addLayout(src_layout)
+        # --- Row 1: Lists ---
 
-        # Destination panel
-        dst_layout = QtWidgets.QVBoxLayout()
-        dst_label = QtWidgets.QLabel("Destination Files (reorderable and draggable)")
-        self.dst_list = FileListWidget("dst")
-        dst_layout.addWidget(dst_label)
-        dst_layout.addWidget(self.dst_list)
-        layout.addLayout(dst_layout)
+        self.src_list = FileListWidget("Source")
+        self.dst_list = FileListWidget("Destination")
 
-        # Side panel: Copy button + log
-        side_layout = QtWidgets.QVBoxLayout()
-        self.copy_button = QtWidgets.QPushButton("Copy and Overwrite Tags")
-        side_layout.addWidget(self.copy_button)
+        grid.addWidget(QtWidgets.QLabel("Source Files"), 0, 0)
+        grid.addWidget(QtWidgets.QLabel("Destination Files"), 0, 1)
+
+        grid.addWidget(self.src_list, 1, 0)
+        grid.addWidget(self.dst_list, 1, 1)
+
+        # --- Row 2: Buttons ---
+
+        self.clear_btn = QtWidgets.QPushButton("Clear Inputs + Log")
+        self.run_btn = QtWidgets.QPushButton("Copy Tags (Run)")
+
+        grid.addWidget(self.clear_btn, 2, 0)
+        grid.addWidget(self.run_btn, 2, 1)
+
+        # --- Row 3: Log View ---
 
         self.log = QtWidgets.QTextEdit()
         self.log.setReadOnly(True)
-        side_layout.addWidget(self.log)
-        layout.addLayout(side_layout)
 
-        # Connections
-        self.copy_button.clicked.connect(self.run_copy)
-        self.src_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.src_list.customContextMenuRequested.connect(self.show_src_context_menu)
-        self.dst_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
-        self.dst_list.customContextMenuRequested.connect(self.show_dst_context_menu)
+        grid.addWidget(QtWidgets.QLabel("Log Output"), 3, 0, 1, 2)
+        grid.addWidget(self.log, 4, 0, 1, 2)
 
-    def append_log(self, message, success=True):
-        """Append message to the QTextEdit log with color depending on success."""
+        # --- Connections ---
+        self.clear_btn.clicked.connect(self.clear_all)
+        self.run_btn.clicked.connect(self.run_copy)
+
+    # ========== Helpers ==========
+
+    def log_line(self, text, success=True):
         color = "green" if success else "red"
-        self.log.append(f'<span style="color:{color}">{message}</span>')
+        self.log.append(f'<span style="color:{color}">{text}</span>')
+
+    def clear_all(self):
+        self.src_list.clear()
+        self.dst_list.clear()
+        self.log.clear()
 
     def run_copy(self):
-        source_files = self.src_list.get_files()
-        dest_files = self.dst_list.get_files()
+        src = self.src_list.get_files()
+        dst = self.dst_list.get_files()
 
-        if len(source_files) != len(dest_files):
-            QtWidgets.QMessageBox.warning(
-                self, "Error", "Source and destination file counts do not match!"
-            )
+        if len(src) != len(dst):
+            QtWidgets.QMessageBox.warning(self, "Error", "Source and destination file counts differ.")
             return
 
         copy_and_paste_tags_bulk(
-            source_files, dest_files, log_func=lambda msg, success=True: self.append_log(msg, success)
+            src, dst,
+            log_func=lambda msg, success=True: self.log_line(msg, success)
         )
         QtWidgets.QMessageBox.information(self, "Done", "Tag copying completed.")
 
