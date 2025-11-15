@@ -1,5 +1,9 @@
 name: Build and Release AppImage
 
+permissions:
+  contents: write
+
+
 on:
   push:
     tags:
