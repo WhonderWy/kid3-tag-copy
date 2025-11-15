@@ -1,3 +1,5 @@
+![Screenshot of Window](kid3-tag-copy.png)
+
 # Kid3 Tag Copier
 
 A simple tool for copying metadata tags from one audio file to another using Kid3.

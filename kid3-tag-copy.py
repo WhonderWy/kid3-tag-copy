@@ -119,10 +119,10 @@ class FileListWidget(QtWidgets.QListWidget):
 
 # --- GUI Main Window ---
 
-class TagCopierApp(QtWidgets.QWidget):
+class TagCopyApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Kid3 Tag Copier")
+        self.setWindowTitle("Kid3 Tag Copy")
         self.resize(1200, 500)
 
         layout = QtWidgets.QHBoxLayout(self)
@@ -220,7 +220,7 @@ def main():
         cli_mode(args.src, args.dst)
     else:
         app = QtWidgets.QApplication(sys.argv)
-        window = TagCopierApp()
+        window = TagCopyApp()
         window.show()
         sys.exit(app.exec())
 
