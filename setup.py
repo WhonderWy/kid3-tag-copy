@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="kid3-tag-copy",
-    version="1.0.0",
+    version="1.1.0",
     license="MIT",
     license_expression="MIT",
     description="Copy tags between audio files using Kid3",
