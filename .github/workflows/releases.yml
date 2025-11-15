@@ -77,6 +77,13 @@ jobs:
             sudo apt-get install -y fuse
           fi
 
+      - name: Install libfuse2 for AppImageTool
+        if: steps.detect-method.outputs.build_method == 'appimagetool'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+
+
       # ----------------------------
       # Cache AppImageTool (only if using appimagetool)
       # ----------------------------
