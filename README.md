@@ -37,5 +37,13 @@ Download [and `chmod +x`] from Releases.
 Run without arguments for GUI mode.
 
 ```shell
-kid3-tag-copy --src a1.mp3 a2.mp3 a3.mp3 --dst b1.flac b2.flac b3.flac
+kid3-tag-copy --src A1.mp3 A2.mp3 A3.mp3 C1.mp3 --DST B1.flac B2.flac B3.flac B4.flac
 ```
+
+|Source|Destination|
+|----|----|
+| A1 | B1 |
+| A2 | B2 |
+| A3 | B3 |
+| C1 | B4 |
+
