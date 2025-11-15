@@ -4,7 +4,7 @@ set -e
 # --- Configuration ---
 APP_NAME="Kid3 Tag Copier"
 APP_EXEC="kid3-tag-copy.py"
-APP_VERSION="1.0"
+APP_VERSION=${1:-"1.0"}  # Get version from command line argument or default to 1.0
 APPDIR="./AppDir"
 DIST_DIR="./dist"
 ICON_FILE="$APPDIR/kid3.png"

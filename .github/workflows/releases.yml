@@ -1,0 +1,47 @@
+name: Build and Release AppImage
+
+on:
+  push:
+    tags:
+      - "v*"  # Trigger release on tag, e.g., v1.0, v2.1, etc.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Install ImageMagick
+      run: sudo apt-get install -y imagemagick
+
+    - name: Install AppImageTool
+      run: |
+        wget -qO appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+
+    - name: Build AppImage
+      run: |
+        # Run the build script and pass the version from the git tag
+        TAG_VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+        ./build-appimage.sh $TAG_VERSION
+
+    - name: Upload AppImage to GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/kid3-tag-copy-$TAG_VERSION.AppImage
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
