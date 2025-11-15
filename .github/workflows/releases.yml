@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python 3.12
       uses: actions/setup-python@v2
       with:
-        python-version: '3.12'  # Set to Python 3.12
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
@@ -25,8 +25,13 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Install ImageMagick
-      run: sudo apt-get install -y imagemagick
+    - name: Install ImageMagick and Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y imagemagick imagemagick-tools
+
+    - name: Verify ImageMagick installation
+      run: magick -version  # Verifies magick command availability
 
     - name: Install AppImageTool
       run: |
