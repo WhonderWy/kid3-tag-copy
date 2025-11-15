@@ -10,7 +10,20 @@ DIST_DIR="./dist"
 ICON_FILE="$APPDIR/kid3.png"
 DESKTOP_FILE="$APPDIR/kid3-tag-copy.desktop"
 APPIMAGETOOL="./appimagetool-x86_64.AppImage"
+VENV_DIR="./venv_appimage"
 PYTHON_BIN="$(which python3 || true)"
+
+# --- Choose build method ---
+BUILD_METHOD="appimagetool"  # default: appimagetool
+for arg in "$@"; do
+    case $arg in
+        --method=briefcase) BUILD_METHOD="briefcase" ;;
+        --method=appimagetool) BUILD_METHOD="appimagetool" ;;
+        --method=pyappimage) BUILD_METHOD="pyappimage" ;;
+    esac
+done
+
+echo "⚙️ Build method: $BUILD_METHOD"
 
 # --- Checks ---
 if [ -z "$PYTHON_BIN" ]; then
@@ -20,14 +33,30 @@ fi
 
 mkdir -p "$APPDIR" "$DIST_DIR"
 
-# --- Step 1: Generate Kid3-like icon ---
-echo "🎨 Generating icon..."
-magick -size 256x256 \
+# --- Step 1: Detect ImageMagick (v6 or v7) ---
+echo "🔍 Detecting ImageMagick..."
+
+if command -v magick >/dev/null; then
+    IM_CMD="magick"
+    echo "✨ Using ImageMagick 7 (magick)"
+elif command -v convert >/dev/null; then
+    IM_CMD="convert"
+    echo "✨ Using ImageMagick 6 (convert)"
+else
+    echo "⚠️ No ImageMagick installation found. Skipping icon generation."
+    IM_CMD=""
+fi
+
+# --- Step 2: Generate icon ---
+if [ -n "$IM_CMD" ]; then
+    echo "🎨 Generating icon using $IM_CMD..."
+    "$IM_CMD" -size 256x256 \
     gradient:lightblue-darkblue \
     -fill white -stroke black -strokewidth 2 \
     -draw "translate 128,128 text -50,0 '♪'" \
     -gravity south -pointsize 36 -annotate +0+20 "Kid3" \
     "$ICON_FILE"
+fi
 
 # --- Step 2: Create desktop file ---
 echo "📝 Creating desktop file..."
@@ -53,25 +82,52 @@ echo "⬇️ Installing dependencies..."
 pip install --upgrade pip
 pip install PySide6
 
+if [ "$BUILD_METHOD" == "briefcase" ]; then
+    pip install briefcase
+elif [ "$BUILD_METHOD" == "pyappimage" ]; then
+    pip install pyappimage
+fi
+
 deactivate
 
 # Copy application files into AppDir
 echo "📂 Copying files into AppDir..."
 cp "$APP_EXEC" "$APPDIR/"
-cp setup.py "$APPDIR/"
+[ -f setup.py ] && cp setup.py "$APPDIR/"
 
 # Copy venv into AppDir for portable execution
 cp -r "$VENV_DIR" "$APPDIR/venv"
 
-# --- Step 4: Download appimagetool if missing ---
-if [ ! -f "$APPIMAGETOOL" ]; then
-    echo "⬇️ Downloading AppImageTool..."
-    wget -O "$APPIMAGETOOL" https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-    chmod +x "$APPIMAGETOOL"
-fi
+# --- Step 5: Build AppImage ---
+case "$BUILD_METHOD" in
 
-# --- Step 5: Make AppImage ---
-echo "🛠️ Building AppImage..."
-"$APPIMAGETOOL" "$APPDIR" "$DIST_DIR/kid3-tag-copy-$APP_VERSION.AppImage"
+    appimagetool)
+        if [ ! -f "$APPIMAGETOOL" ]; then
+            echo "⬇️ Downloading AppImageTool..."
+            wget -O "$APPIMAGETOOL" https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+            chmod +x "$APPIMAGETOOL"
+        fi
 
-echo "✅ Done! AppImage created in $DIST_DIR/kid3-tag-copy-$APP_VERSION.AppImage"
+        echo "🛠️ Building AppImage with appimagetool..."
+        "$APPIMAGETOOL" "$APPDIR" "$DIST_DIR/kid3-tag-copy-$APP_VERSION.AppImage"
+        ;;
+
+    briefcase)
+        echo "🛠️ Building with Briefcase..."
+        source "$VENV_DIR/bin/activate"
+        briefcase create linux --name "kid3-tag-copy" --version "$APP_VERSION" --app "$APP_EXEC" --output "$DIST_DIR"
+        briefcase build linux
+        briefcase package linux
+        deactivate
+        ;;
+
+    pyappimage)
+        echo "🛠️ Building with PyAppImage..."
+        source "$VENV_DIR/bin/activate"
+        pyappimage -v "$APP_VERSION" -d "$APPDIR" -o "$DIST_DIR/kid3-tag-copy-$APP_VERSION.AppImage"
+        deactivate
+        ;;
+
+esac
+
+echo "✅ Done! AppImage created in $DIST_DIR"

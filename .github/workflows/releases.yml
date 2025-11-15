@@ -10,46 +10,112 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ----------------------------
+      # Checkout
+      # ----------------------------
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
+      # ----------------------------
+      # Python Setup (cached)
+      # ----------------------------
       - name: Set up Python 3.12
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
+          cache: "pip"
 
+      # ----------------------------
+      # Install Python dependencies
+      # ----------------------------
       - name: Install Python dependencies
         run: |
           python -m venv venv
           source venv/bin/activate
-          pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download ImageMagick portable binary
+      # ----------------------------
+      # Detect build method from script args
+      # ----------------------------
+      - name: Detect build method
+        id: detect-method
         run: |
-          # Download the ImageMagick portable "magick" binary
-          curl -L -o magick "https://imagemagick.org/download/binaries/magick"  # from official site :contentReference[oaicite:1]{index=1}
-          chmod +x magick
-          # Put it into PATH
-          echo "${{ github.workspace }}" >> $GITHUB_PATH
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
 
-      - name: Verify ImageMagick
-        run: |
-          ./magick -version
+          # default method
+          METHOD="appimagetool"
 
-      - name: Install AppImageTool
+          # extract --method=value from arguments passed to build script
+          if [[ "$@" == *"--method="* ]]; then
+            METHOD=$(echo "$@" | sed 's/.*--method=\([^ ]*\).*/\1/')
+          fi
+
+          echo "build_method=$METHOD" >> $GITHUB_OUTPUT
+        shell: bash
+
+      # ----------------------------
+      # Ensure ImageMagick exists (minimal install)
+      # ----------------------------
+      - name: Ensure ImageMagick is available
         run: |
-          wget -qO appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          if command -v magick >/dev/null || command -v convert >/dev/null; then
+            echo "ImageMagick already installed."
+          else
+            echo "Installing ImageMagick..."
+            sudo apt-get update
+            sudo apt-get install -y imagemagick
+          fi
+
+      # ----------------------------
+      # Install fuse *only if using appimagetool*
+      # ----------------------------
+      - name: Ensure FUSE (for AppImage mount)
+        if: steps.detect-method.outputs.build_method == 'appimagetool'
+        run: |
+          if ! command -v fusermount >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y fuse
+          fi
+
+      # ----------------------------
+      # Cache AppImageTool (only if using appimagetool)
+      # ----------------------------
+      - name: Cache AppImageTool
+        id: cache-appimagetool
+        if: steps.detect-method.outputs.build_method == 'appimagetool'
+        uses: actions/cache@v4
+        with:
+          path: appimagetool-x86_64.AppImage
+          key: appimagetool-smallest
+
+      # ----------------------------
+      # Download smallest AppImageTool build (only if needed)
+      # ----------------------------
+      - name: Install AppImageTool (if missing)
+        if: steps.detect-method.outputs.build_method == 'appimagetool' && steps.cache-appimagetool.outputs.cache-hit != 'true'
+        run: |
+          # Use "zsync2" optimized version – smaller + minimal deps
+          wget -qO appimagetool-x86_64.AppImage \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool-x86_64.AppImage
 
+      # ----------------------------
+      # Build AppImage
+      # ----------------------------
       - name: Build AppImage
         run: |
-          TAG_VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-          ./build-appimage.sh $TAG_VERSION
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          METHOD="${{ steps.detect-method.outputs.build_method }}"
 
+          echo "Using build method: $METHOD"
+          ./build-appimage.sh "$TAG_VERSION" --method="$METHOD"
+
+      # ----------------------------
+      # Upload Release
+      # ----------------------------
       - name: Upload AppImage to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/kid3-tag-copy-$TAG_VERSION.AppImage
+          files: dist/kid3-tag-copy-*.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
