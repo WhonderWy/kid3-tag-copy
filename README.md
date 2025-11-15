@@ -2,7 +2,7 @@
 
 # Kid3 Tag Copier
 
-A simple tool for copying metadata tags from one audio file to another using Kid3.
+A simple wrapper for copying metadata tags from one audio file to another using Kid3. `kid3-cli` must be available on path.
 
 ## Installation
 
