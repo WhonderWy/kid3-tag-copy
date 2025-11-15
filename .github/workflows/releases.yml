@@ -3,50 +3,53 @@ name: Build and Release AppImage
 on:
   push:
     tags:
-      - "v*"  # Trigger release on tag, e.g., v1.0, v2.1, etc.
+      - "v*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout the repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.12'
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.12'
 
-    - name: Install dependencies
-      run: |
-        python -m venv venv
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install Python dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Install ImageMagick and Tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y imagemagick imagemagick-tools
+      - name: Download ImageMagick portable binary
+        run: |
+          # Download the ImageMagick portable "magick" binary
+          curl -L -o magick "https://imagemagick.org/download/binaries/magick"  # from official site :contentReference[oaicite:1]{index=1}
+          chmod +x magick
+          # Put it into PATH
+          echo "${{ github.workspace }}" >> $GITHUB_PATH
 
-    - name: Verify ImageMagick installation
-      run: magick -version  # Verifies magick command availability
+      - name: Verify ImageMagick
+        run: |
+          ./magick -version
 
-    - name: Install AppImageTool
-      run: |
-        wget -qO appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-        chmod +x appimagetool-x86_64.AppImage
+      - name: Install AppImageTool
+        run: |
+          wget -qO appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
 
-    - name: Build AppImage
-      run: |
-        # Run the build script and pass the version from the git tag
-        TAG_VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-        ./build-appimage.sh $TAG_VERSION
+      - name: Build AppImage
+        run: |
+          TAG_VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+          ./build-appimage.sh $TAG_VERSION
 
-    - name: Upload AppImage to GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: dist/kid3-tag-copy-$TAG_VERSION.AppImage
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload AppImage to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/kid3-tag-copy-$TAG_VERSION.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
