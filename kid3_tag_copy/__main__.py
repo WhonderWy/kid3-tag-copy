@@ -1,0 +1,1 @@
+from .kid3_tag_copy import main

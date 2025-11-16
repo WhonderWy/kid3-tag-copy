@@ -3,7 +3,7 @@ set -e
 
 # --- Configuration ---
 APP_NAME="Kid3 Tag Copier"
-APP_EXEC="kid3-tag-copy.py"
+APP_EXEC="kid3-tag-copy"
 APP_VERSION=${1:-"1.0"}  # Get version from command line argument or default to 1.0
 APPDIR="./AppDir"
 DIST_DIR="./dist"
@@ -92,7 +92,7 @@ deactivate
 
 # Copy application files into AppDir
 echo "📂 Copying files into AppDir..."
-cp "$APP_EXEC" "$APPDIR/"
+cp -r kid3_tag_copy "$APPDIR/"
 [ -f setup.py ] && cp setup.py "$APPDIR/"
 
 # Copy venv into AppDir for portable execution

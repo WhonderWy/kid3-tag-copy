@@ -1,18 +1,12 @@
-[build-system]
-requires = ["setuptools>=65.5.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "kid3-tag-copy"
 version = "1.0.0"
 description = "Copy tags between audio files using Kid3."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
-authors = [
-    { name="WhonderWy" }
-]
-urls = { "Homepage" = "https://github.com/WhonderWy/kid3-tag-copy" }
+license = "MIT"   # SPDX string, not table
+authors = [{ name="WhonderWy" }]
+urls = { Homepage = "https://github.com/WhonderWy/kid3-tag-copy" }
 keywords = ["audio", "tags", "kid3", "mp3", "flac"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -23,9 +17,17 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+dependencies = [
+    "pyside6",
+]
+
+[project.optional-dependencies]
+system = ["kid3-cli"]
+
 [project.scripts]
 kid3-tag-copy = "kid3_tag_copy.kid3_tag_copy:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["tests", "venv", "dist", "*.egg-info"]
+include = ["kid3_tag_copy"]
+exclude = ["tests", "venv*", "AppDir*", "dist", "*.egg-info"]
