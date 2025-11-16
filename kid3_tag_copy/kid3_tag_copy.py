@@ -3,6 +3,7 @@ import sys
 import subprocess
 from pathlib import Path
 from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6.QtGui import QMovie
 import argparse
 import shutil
 
@@ -46,6 +47,22 @@ def copy_and_paste_tags_bulk(source_files, dest_files, log_func=print):
             log_func(f"ERROR copying tags for pair:\n{stderr}", success=False)
 
 
+class Worker(QtCore.QThread):
+    log_signal = QtCore.Signal(str, bool)
+    finished_signal = QtCore.Signal()
+
+    def __init__(self, src, dst):
+        super().__init__()
+        self.src = src
+        self.dst = dst
+
+    def run(self):
+        copy_and_paste_tags_bulk(
+            self.src,
+            self.dst,
+            log_func=lambda msg, success=True: self.log_signal.emit(msg, success)
+        )
+        self.finished_signal.emit()
 
 # --- GUI Widgets ---
 
@@ -171,6 +188,9 @@ class TagCopyApp(QtWidgets.QWidget):
         self.clear_btn.clicked.connect(self.clear_all)
         self.run_btn.clicked.connect(self.run_copy)
 
+        # Progress dialog
+        self.progress = None
+
     # ========== Helpers ==========
 
     def log_line(self, text, success=True):
@@ -190,10 +210,30 @@ class TagCopyApp(QtWidgets.QWidget):
             QtWidgets.QMessageBox.warning(self, "Error", "Source and destination file counts differ.")
             return
 
-        copy_and_paste_tags_bulk(
-            src, dst,
-            log_func=lambda msg, success=True: self.log_line(msg, success)
-        )
+        # Log button press
+        self.log_line("Run button pressed, starting copy...", success=True)
+
+        # Disable button, show spinner
+        self.run_btn.setEnabled(False)
+
+        # Show progress dialog
+        self.progress = QtWidgets.QProgressDialog("Copying tags...", None, 0, 0, self)
+        self.progress.setWindowTitle("Please wait")
+        self.progress.setWindowModality(QtCore.Qt.WindowModal)
+        self.progress.setCancelButton(None)
+        self.progress.show()
+
+        # Launch worker thread
+        self.worker = Worker(src, dst)
+        self.worker.log_signal.connect(self.log_line)
+        self.worker.finished_signal.connect(self.copy_finished)
+        self.worker.start()
+
+    def copy_finished(self):
+        if self.progress:
+            self.progress.close()
+            self.progress = None
+        self.run_btn.setEnabled(True)
         QtWidgets.QMessageBox.information(self, "Done", "Tag copying completed.")
 
     def show_src_context_menu(self, pos):
