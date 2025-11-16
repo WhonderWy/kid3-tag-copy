@@ -1,6 +1,6 @@
 [project]
 name = "kid3-tag-copy"
-version = "1.0.0"
+version = "1.0.1"
 description = "Copy tags between audio files using Kid3."
 readme = "README.md"
 requires-python = ">=3.10"
